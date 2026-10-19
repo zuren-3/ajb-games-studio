@@ -8,23 +8,38 @@
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
   const now = () => performance.now();
 
-  /* ---------- pictures: hide SVG until image loads, then Steam mirrors fallback ---------- */
-  $$('.art').forEach(art => {
-    const img = art.querySelector('img');
-    const svg = art.querySelector('svg');
-    if (!img) return;
-    // Hide SVG immediately so there's no flash of the placeholder
-    if (svg) svg.style.opacity = '0';
-    const fb = (img.dataset.fb || '').split(' ').filter(Boolean);
-    const onLoad = () => { img.classList.add('ok'); }; // image loaded fine, SVG stays hidden
-    const onFail = () => {
-      const n = fb.shift();
-      if (n) { img.src = n; } // try next Steam CDN mirror
-      else { img.remove(); if (svg) svg.style.opacity = ''; } // all failed, show SVG
+  /* ---------- light / dark mode ---------- */
+  const tgl = $('#themeToggle'), rootEl = document.documentElement, themeMeta = $('meta[name="theme-color"]');
+  function setTheme(t) {
+    rootEl.dataset.theme = t;
+    try { localStorage.setItem('ajb-theme', t); } catch (e) {}
+    if (themeMeta) themeMeta.setAttribute('content', t === 'light' ? '#f4f1ec' : '#04060a');
+    if (tgl) tgl.setAttribute('aria-label', t === 'light' ? 'Switch to dark mode' : 'Switch to light mode');
+  }
+  if (tgl) tgl.addEventListener('click', () => setTheme(rootEl.dataset.theme === 'light' ? 'dark' : 'light'));
+  setTheme(rootEl.dataset.theme || 'dark');
+
+  /* ---------- mobile pop-out menu ---------- */
+  const menuBtn = $('#menuBtn'), menuPanel = $('#menuPanel');
+  if (menuBtn && menuPanel) {
+    const setMenu = open => {
+      menuPanel.classList.toggle('open', open);
+      menuBtn.setAttribute('aria-expanded', String(open));
+      menuBtn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
     };
-    img.addEventListener('load', onLoad);
-    img.addEventListener('error', onFail);
-    if (img.complete) { if (img.naturalWidth) onLoad(); else onFail(); }
+    menuBtn.addEventListener('click', e => { e.stopPropagation(); setMenu(!menuPanel.classList.contains('open')); });
+    document.addEventListener('click', e => { if (!e.target.closest('.site-header')) setMenu(false); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { setMenu(false); menuBtn.focus(); } });
+    menuPanel.addEventListener('click', e => { if (e.target.closest('a')) setMenu(false); });
+    addEventListener('resize', () => { if (innerWidth > 560) setMenu(false); });
+  }
+
+  /* ---------- pictures: local file, then Steam mirrors, then the drawn scene ---------- */
+  $$('img[data-fb]').forEach(img => {
+    const fb = img.dataset.fb.split(' ').filter(Boolean);
+    const next = () => { const n = fb.shift(); if (n) img.src = n; else img.remove(); };
+    img.addEventListener('error', next);
+    if (img.complete) { if (img.naturalWidth) img.classList.add('ok'); else next(); }
   });
 
   /* ---------- scroll: progress bar, parallax, timeline line ---------- */
@@ -127,65 +142,30 @@
       const spans = $$('.bl', titleEl);
       if (!spans.length) return;
       const sp = spans[Math.random() * spans.length | 0];
-      // build a random sequence of dim/bright flashes
+      // a dying bulb: rapid stutters between dark and half-lit
       const seq = [];
-      const n = 2 + (Math.random() * 3 | 0);
-      for (let i = 0; i < n; i++) { seq.push({ op: Math.random() < .5 ? 0.04 : 0.6, d: 40 + Math.random() * 80 }); }
-      seq.push({ op: 1, d: 60 });
+      const n = 3 + (Math.random() * 4 | 0);
+      for (let i = 0; i < n; i++) { seq.push({ op: Math.random() < .55 ? .05 : .5, d: 25 + Math.random() * 75 }); }
+      // ...then it catches: a bright, glowing pop
+      seq.push({ op: 1, glow: 1, d: 70 + Math.random() * 90 });
+      // sometimes it dies again right after
+      if (Math.random() < .35) seq.push({ op: .05, d: 40 + Math.random() * 50 });
       let delay = 0;
-      seq.forEach(({ op, d }) => {
-        setTimeout(() => { sp.style.opacity = op; }, delay);
+      seq.forEach(({ op, d, glow }) => {
+        setTimeout(() => {
+          sp.style.opacity = op;
+          sp.style.textShadow = glow ? '0 0 24px rgba(255,72,48,.95),0 0 80px rgba(255,40,25,.6)' : '';
+        }, delay);
         delay += d;
       });
-      setTimeout(() => { sp.style.opacity = ''; }, delay);
-      // schedule next flicker — random gap between 1.8s and 5s
-      setTimeout(bulbFlicker, 1800 + Math.random() * 3200);
+      setTimeout(() => { sp.style.opacity = ''; sp.style.textShadow = ''; }, delay);
+      // schedule next flicker — random gap between 1.5s and 5.3s
+      setTimeout(bulbFlicker, 1500 + Math.random() * 3800);
     }
-    setTimeout(bulbFlicker, 1200 + Math.random() * 2000);
+    setTimeout(bulbFlicker, 900 + Math.random() * 1800);
   }
 
-  /* ---------- VHS shelf ---------- */
-  (function vhsShelf() {
-    const shelf = $('#vhsShelf'); if (!shelf) return;
-    const panel = $('#vhsPanel'), panelArt = $('#vhsPanelArt'), panelInfo = $('#vhsPanelInfo');
-    const games = window.AJB_GAMES ? [...window.AJB_GAMES].reverse() : []; // oldest first
-    let active = -1;
-
-    function open(idx) {
-      const g = games[idx]; if (!g) return;
-      // toggle closed if same tape clicked again
-      if (active === idx) { close(); return; }
-      active = idx;
-      $$('.vhs', shelf).forEach((t, i) => t.classList.toggle('open', i === idx));
-      // build art
-      const p = location.pathname.includes('/games/') ? '../' : '';
-      panelArt.innerHTML = `<div class="art" style="--c:${g.color}"><img src="${p}images/${g.id}-hero.jpg" alt="${g.title}" loading="lazy" decoding="async" onload="this.classList.add('ok')"></div>`;
-      // build info
-      const btns = g.links.length
-        ? g.links.map(([l, u], k) => `<a class="btn ${k ? '' : 'lamp'}" href="${u}" target="_blank" rel="noopener">${l}</a>`).join('')
-        : `<a class="btn lamp" href="${p}games/${g.id}.html">Open the case file</a>`;
-      panelInfo.innerHTML = `<span class="status"><i${g.status === 'released' ? '' : ' class="hollow"'}></i>${g.when}</span><h3 style="--c:${g.color}">${g.title}</h3><p>${g.blurb}</p><div class="row">${btns}<a class="btn" href="${p}games/${g.id}.html">Case file →</a></div>`;
-      panel.classList.add('show');
-      // smooth scroll panel into view on mobile
-      if (coarse) setTimeout(() => panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
-    }
-
-    function close() {
-      active = -1;
-      $$('.vhs', shelf).forEach(t => t.classList.remove('open'));
-      panel.classList.remove('show');
-    }
-
-    $$('.vhs', shelf).forEach((tape, i) => {
-      tape.addEventListener('click', () => open(i));
-      tape.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(i); } });
-    });
-
-    // open first tape by default after a short delay
-    setTimeout(() => open(0), 800);
-  })();
-
-  if (reduce) return;
+  if (reduce) { $$('.corridor').forEach(c => c.classList.remove('live')); return; }
 
   /* ---------- WebGL fog lit by a torch ---------- */
   const VS = 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
@@ -232,20 +212,14 @@ void main(){
     S.cv = $('canvas.gl', el); S.ec = $('canvas.eyes', el); S.flash = $('.flash', el);
     S.tcs = $$('.tc', el); S.entEl = $('[data-ent]', el); S.cauEl = $('[data-caught]', el);
     S.tint = (S.cv && S.cv.dataset.tint || '90,170,255').split(',').map(x => x / 255);
-    // Lazy-init WebGL — defer corridor GL until it's nearly visible
-    const isCorridor = el.dataset.stage === 'corridor';
-    S.glReady = !isCorridor;
-    S.g = (!isCorridor && S.cv) ? makeGL(S.cv) : null; if (S.cv && !isCorridor) { if (!S.g) S.cv.hidden = true; }
-    if (isCorridor && S.cv) S.cv.hidden = true; // hidden until IO fires
+    S.g = S.cv ? makeGL(S.cv) : null; if (S.cv && !S.g) S.cv.hidden = true;
     S.ctx = S.ec ? S.ec.getContext('2d') : null;
-    S.maxEyes = coarse ? 2 : 4; // fewer eyes = less canvas work
+    S.maxEyes = coarse ? 3 : 5;
 
     function size() {
       const r = el.getBoundingClientRect(); S.w = Math.max(1, r.width); S.h = Math.max(1, r.height);
-      // Use lower resolution on mobile/low-power devices
-      const resFactor = coarse ? 0.3 : Math.min(.45, 800 / S.w);
-      if (S.cv && S.g) { const k = resFactor * (S.q || 1); S.cv.width = Math.max(2, S.w * k | 0); S.cv.height = Math.max(2, S.h * k | 0); S.g.gl.viewport(0, 0, S.cv.width, S.cv.height); }
-      if (S.ec) { const d = Math.min(devicePixelRatio || 1, coarse ? 1 : 1.5); S.ec.width = S.w * d | 0; S.ec.height = S.h * d | 0; S.d = d; }
+      if (S.cv && S.g) { const k = Math.min(.5, 900 / S.w) * (S.q || 1); S.cv.width = Math.max(2, S.w * k | 0); S.cv.height = Math.max(2, S.h * k | 0); S.g.gl.viewport(0, 0, S.cv.width, S.cv.height); }
+      if (S.ec) { const d = Math.min(devicePixelRatio || 1, 1.5); S.ec.width = S.w * d | 0; S.ec.height = S.h * d | 0; S.d = d; }
       if (S.title) { const tr = S.title.getBoundingClientRect(); S.tox = tr.left - r.left; S.toy = tr.top - r.top; }
       S.sc = clamp(S.h / 800, .7, 1.25);
     }
@@ -259,16 +233,7 @@ void main(){
       const r = el.getBoundingClientRect(); S.tx = (e.clientX - r.left) / r.width; S.ty = (e.clientY - r.top) / r.height; S.last = now();
       photo(S);
     });
-    new IntersectionObserver(es => {
-      S.vis = es[0].isIntersecting;
-      // Lazy-init corridor WebGL on first approach
-      if (S.vis && !S.glReady && S.cv) {
-        S.glReady = true;
-        S.g = makeGL(S.cv);
-        if (S.g) { S.cv.hidden = false; S.size(); } else S.cv.hidden = true;
-      }
-      if (S.vis) loop();
-    }, { rootMargin: '200px' }).observe(el);
+    new IntersectionObserver(es => { S.vis = es[0].isIntersecting; if (S.vis) loop(); }, { rootMargin: '80px' }).observe(el);
     stages.push(S);
   }
 
