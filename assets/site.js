@@ -31,8 +31,40 @@
     document.addEventListener('click', e => { if (!e.target.closest('.site-header')) setMenu(false); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape') { setMenu(false); menuBtn.focus(); } });
     menuPanel.addEventListener('click', e => { if (e.target.closest('a')) setMenu(false); });
-    addEventListener('resize', () => { if (innerWidth > 640) setMenu(false); });
+    addEventListener('resize', () => { if (innerWidth > 760) setMenu(false); });
   }
+
+
+  /* ---------- nav: mark the current page / section ---------- */
+  (function () {
+    const links = $$('.nav a:not(.btn), .menu a:not([href*="steampowered"])');
+    if (!links.length) return;
+    const page = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
+    const inGames = page === 'games.html' || /\/games\//.test(location.pathname);
+    const follow = document.getElementById('follow');
+    const hrefOf = a => (a.getAttribute('href') || '');
+    const mark = key => links.forEach(a => {
+      const h = hrefOf(a);
+      const k = h.endsWith('#follow') ? 'follow' : h.endsWith('studio.html') ? 'studio' : h.endsWith('games.html') ? 'games' : '';
+      if (k && k === key) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+    if (inGames) return mark('games');
+    if (page !== 'studio.html') return mark('');
+    const update = () => {
+      let key = 'studio';
+      if (location.hash === '#follow') key = 'follow';
+      if (follow) {
+        const r = follow.getBoundingClientRect();
+        if (r.top < innerHeight * 0.55) key = 'follow';
+        else if (location.hash === '#follow' && r.top > innerHeight) key = 'studio';
+      }
+      mark(key);
+    };
+    addEventListener('scroll', update, { passive: true });
+    addEventListener('hashchange', update);
+    links.forEach(a => a.addEventListener('click', () => { if (hrefOf(a).endsWith('#follow')) mark('follow'); }));
+    update();
+  })();
 
   /* ---------- pictures: local file, then Steam mirrors, then the drawn scene ---------- */
   $$('img[data-fb]').forEach(img => {
@@ -45,8 +77,10 @@
   /* ---------- scroll: progress bar, parallax, timeline line ---------- */
   const bar = $('#progress'), layers = $$('[data-parallax]'), tl = $('#tl');
   let ticking = false;
+  const header = $('.site-header');
   function onScroll() {
     ticking = false;
+    if (header) header.classList.toggle('is-scrolled', scrollY > 48);
     const max = document.documentElement.scrollHeight - innerHeight;
     if (bar) bar.style.transform = `scaleX(${max > 0 ? clamp(scrollY / max, 0, 1) : 0})`;
     if (!reduce) layers.forEach(l => { if (scrollY < innerHeight * 1.4) l.style.transform = `translate3d(0,${scrollY * .28}px,0)`; });
