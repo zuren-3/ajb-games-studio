@@ -8,79 +8,30 @@
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
   const now = () => performance.now();
 
-  /* ---------- light / dark mode ---------- */
-  const tgl = $('#themeToggle'), rootEl = document.documentElement, themeMeta = $('meta[name="theme-color"]');
-  function setTheme(t) {
-    rootEl.dataset.theme = t;
-    try { localStorage.setItem('ajb-theme', t); } catch (e) {}
-    if (themeMeta) themeMeta.setAttribute('content', t === 'light' ? '#f4f1ec' : '#04060a');
-    if (tgl) tgl.setAttribute('aria-label', t === 'light' ? 'Switch to dark mode' : 'Switch to light mode');
-  }
-  if (tgl) tgl.addEventListener('click', () => setTheme(rootEl.dataset.theme === 'light' ? 'dark' : 'light'));
-  setTheme(rootEl.dataset.theme || 'dark');
-
-  /* ---------- mobile pop-out menu ---------- */
-  const menuBtn = $('#menuBtn'), menuPanel = $('#menuPanel');
-  if (menuBtn && menuPanel) {
-    const setMenu = open => {
-      menuPanel.classList.toggle('open', open);
-      menuBtn.setAttribute('aria-expanded', String(open));
-      menuBtn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+  /* ---------- pictures: hide SVG until image loads, then Steam mirrors fallback ---------- */
+  $$('.art').forEach(art => {
+    const img = art.querySelector('img');
+    const svg = art.querySelector('svg');
+    if (!img) return;
+    // Hide SVG immediately so there's no flash of the placeholder
+    if (svg) svg.style.opacity = '0';
+    const fb = (img.dataset.fb || '').split(' ').filter(Boolean);
+    const onLoad = () => { img.classList.add('ok'); }; // image loaded fine, SVG stays hidden
+    const onFail = () => {
+      const n = fb.shift();
+      if (n) { img.src = n; } // try next Steam CDN mirror
+      else { img.remove(); if (svg) svg.style.opacity = ''; } // all failed, show SVG
     };
-    menuBtn.addEventListener('click', e => { e.stopPropagation(); setMenu(!menuPanel.classList.contains('open')); });
-    document.addEventListener('click', e => { if (!e.target.closest('.site-header')) setMenu(false); });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') { setMenu(false); menuBtn.focus(); } });
-    menuPanel.addEventListener('click', e => { if (e.target.closest('a')) setMenu(false); });
-    addEventListener('resize', () => { if (innerWidth > 760) setMenu(false); });
-  }
-
-
-  /* ---------- nav: mark the current page / section ---------- */
-  (function () {
-    const links = $$('.nav a:not(.btn), .menu a:not([href*="steampowered"])');
-    if (!links.length) return;
-    const page = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
-    const inGames = page === 'games.html' || /\/games\//.test(location.pathname);
-    const follow = document.getElementById('follow');
-    const hrefOf = a => (a.getAttribute('href') || '');
-    const mark = key => links.forEach(a => {
-      const h = hrefOf(a);
-      const k = h.endsWith('#follow') ? 'follow' : h.endsWith('studio.html') ? 'studio' : h.endsWith('games.html') ? 'games' : '';
-      if (k && k === key) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
-    });
-    if (inGames) return mark('games');
-    if (page !== 'studio.html') return mark('');
-    const update = () => {
-      let key = 'studio';
-      if (location.hash === '#follow') key = 'follow';
-      if (follow) {
-        const r = follow.getBoundingClientRect();
-        if (r.top < innerHeight * 0.55) key = 'follow';
-        else if (location.hash === '#follow' && r.top > innerHeight) key = 'studio';
-      }
-      mark(key);
-    };
-    addEventListener('scroll', update, { passive: true });
-    addEventListener('hashchange', update);
-    links.forEach(a => a.addEventListener('click', () => { if (hrefOf(a).endsWith('#follow')) mark('follow'); }));
-    update();
-  })();
-
-  /* ---------- pictures: local file, then Steam mirrors, then the drawn scene ---------- */
-  $$('img[data-fb]').forEach(img => {
-    const fb = img.dataset.fb.split(' ').filter(Boolean);
-    const next = () => { const n = fb.shift(); if (n) img.src = n; else img.remove(); };
-    img.addEventListener('error', next);
-    if (img.complete) { if (img.naturalWidth) img.classList.add('ok'); else next(); }
+    img.addEventListener('load', onLoad);
+    img.addEventListener('error', onFail);
+    if (img.complete) { if (img.naturalWidth) onLoad(); else onFail(); }
   });
 
   /* ---------- scroll: progress bar, parallax, timeline line ---------- */
   const bar = $('#progress'), layers = $$('[data-parallax]'), tl = $('#tl');
   let ticking = false;
-  const header = $('.site-header');
   function onScroll() {
     ticking = false;
-    if (header) header.classList.toggle('is-scrolled', scrollY > 48);
     const max = document.documentElement.scrollHeight - innerHeight;
     if (bar) bar.style.transform = `scaleX(${max > 0 ? clamp(scrollY / max, 0, 1) : 0})`;
     if (!reduce) layers.forEach(l => { if (scrollY < innerHeight * 1.4) l.style.transform = `translate3d(0,${scrollY * .28}px,0)`; });
@@ -176,53 +127,65 @@
       const spans = $$('.bl', titleEl);
       if (!spans.length) return;
       const sp = spans[Math.random() * spans.length | 0];
-      // a dying bulb: rapid stutters between dark and half-lit
+      // build a random sequence of dim/bright flashes
       const seq = [];
-      const n = 3 + (Math.random() * 4 | 0);
-      for (let i = 0; i < n; i++) { seq.push({ op: Math.random() < .55 ? .05 : .5, d: 25 + Math.random() * 75 }); }
-      // ...then it catches: a bright, glowing pop
-      seq.push({ op: 1, glow: 1, d: 70 + Math.random() * 90 });
-      // sometimes it dies again right after
-      if (Math.random() < .35) seq.push({ op: .05, d: 40 + Math.random() * 50 });
+      const n = 2 + (Math.random() * 3 | 0);
+      for (let i = 0; i < n; i++) { seq.push({ op: Math.random() < .5 ? 0.04 : 0.6, d: 40 + Math.random() * 80 }); }
+      seq.push({ op: 1, d: 60 });
       let delay = 0;
-      seq.forEach(({ op, d, glow }) => {
-        setTimeout(() => {
-          sp.style.opacity = op;
-          sp.style.textShadow = glow ? '0 0 24px rgba(255,72,48,.95),0 0 80px rgba(255,40,25,.6)' : '';
-        }, delay);
+      seq.forEach(({ op, d }) => {
+        setTimeout(() => { sp.style.opacity = op; }, delay);
         delay += d;
       });
-      setTimeout(() => { sp.style.opacity = ''; sp.style.textShadow = ''; }, delay);
-      // schedule next flicker — random gap between 1.5s and 5.3s
-      setTimeout(bulbFlicker, 1500 + Math.random() * 3800);
+      setTimeout(() => { sp.style.opacity = ''; }, delay);
+      // schedule next flicker — random gap between 1.8s and 5s
+      setTimeout(bulbFlicker, 1800 + Math.random() * 3200);
     }
-    setTimeout(bulbFlicker, 900 + Math.random() * 1800);
+    setTimeout(bulbFlicker, 1200 + Math.random() * 2000);
   }
 
-  /* ---------- mobile tape archive: native swipe deck (runs regardless of animation settings) ---------- */
-  const deck = $('#tapeDeck');
-  if (deck) {
-    const tapes = $$('.tape', deck), tag = $('#tapeTag'), num = $('#tapeNum'), cue = $('.scroll-cue');
-    let ticking = false, activeTape = -1;
-    const upd = () => {
-      ticking = false;
-      const mid = deck.clientWidth / 2;
-      let best = 0, bd = 1e9;
-      tapes.forEach((t, i) => { const r = t.getBoundingClientRect(); const d = Math.abs(r.left + r.width / 2 - mid); if (d < bd) { bd = d; best = i; } });
-      if (best === activeTape) return; // touch the DOM only when the centered tape changes
-      activeTape = best;
-      tapes.forEach((t, i) => t.classList.toggle('on', i === best));
-      if (tag) tag.textContent = tapes[best].dataset.tag || '';
-      if (num) num.textContent = String(best + 1).padStart(2, '0');
-    };
-    deck.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(upd); } }, { passive: true });
-    const mq = matchMedia('(max-width:760px)');
-    const setTarget = () => { if (cue) cue.setAttribute('href', mq.matches ? '#tapeArch' : '#corridor'); };
-    mq.addEventListener('change', setTarget); setTarget();
-    upd();
-  }
+  /* ---------- VHS shelf ---------- */
+  (function vhsShelf() {
+    const shelf = $('#vhsShelf'); if (!shelf) return;
+    const panel = $('#vhsPanel'), panelArt = $('#vhsPanelArt'), panelInfo = $('#vhsPanelInfo');
+    const games = window.AJB_GAMES ? [...window.AJB_GAMES].reverse() : []; // oldest first
+    let active = -1;
 
-  if (reduce) { $$('.corridor').forEach(c => c.classList.remove('live')); return; }
+    function open(idx) {
+      const g = games[idx]; if (!g) return;
+      // toggle closed if same tape clicked again
+      if (active === idx) { close(); return; }
+      active = idx;
+      $$('.vhs', shelf).forEach((t, i) => t.classList.toggle('open', i === idx));
+      // build art
+      const p = location.pathname.includes('/games/') ? '../' : '';
+      panelArt.innerHTML = `<div class="art" style="--c:${g.color}"><img src="${p}images/${g.id}-hero.jpg" alt="${g.title}" loading="lazy" decoding="async" onload="this.classList.add('ok')"></div>`;
+      // build info
+      const btns = g.links.length
+        ? g.links.map(([l, u], k) => `<a class="btn ${k ? '' : 'lamp'}" href="${u}" target="_blank" rel="noopener">${l}</a>`).join('')
+        : `<a class="btn lamp" href="${p}games/${g.id}.html">Open the case file</a>`;
+      panelInfo.innerHTML = `<span class="status"><i${g.status === 'released' ? '' : ' class="hollow"'}></i>${g.when}</span><h3 style="--c:${g.color}">${g.title}</h3><p>${g.blurb}</p><div class="row">${btns}<a class="btn" href="${p}games/${g.id}.html">Case file →</a></div>`;
+      panel.classList.add('show');
+      // smooth scroll panel into view on mobile
+      if (coarse) setTimeout(() => panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+    }
+
+    function close() {
+      active = -1;
+      $$('.vhs', shelf).forEach(t => t.classList.remove('open'));
+      panel.classList.remove('show');
+    }
+
+    $$('.vhs', shelf).forEach((tape, i) => {
+      tape.addEventListener('click', () => open(i));
+      tape.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(i); } });
+    });
+
+    // open first tape by default after a short delay
+    setTimeout(() => open(0), 800);
+  })();
+
+  if (reduce) return;
 
   /* ---------- WebGL fog lit by a torch ---------- */
   const VS = 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
@@ -269,14 +232,20 @@ void main(){
     S.cv = $('canvas.gl', el); S.ec = $('canvas.eyes', el); S.flash = $('.flash', el);
     S.tcs = $$('.tc', el); S.entEl = $('[data-ent]', el); S.cauEl = $('[data-caught]', el);
     S.tint = (S.cv && S.cv.dataset.tint || '90,170,255').split(',').map(x => x / 255);
-    S.g = S.cv ? makeGL(S.cv) : null; if (S.cv && !S.g) S.cv.hidden = true;
+    // Lazy-init WebGL — defer corridor GL until it's nearly visible
+    const isCorridor = el.dataset.stage === 'corridor';
+    S.glReady = !isCorridor;
+    S.g = (!isCorridor && S.cv) ? makeGL(S.cv) : null; if (S.cv && !isCorridor) { if (!S.g) S.cv.hidden = true; }
+    if (isCorridor && S.cv) S.cv.hidden = true; // hidden until IO fires
     S.ctx = S.ec ? S.ec.getContext('2d') : null;
-    S.maxEyes = coarse ? 3 : 5;
+    S.maxEyes = coarse ? 2 : 4; // fewer eyes = less canvas work
 
     function size() {
       const r = el.getBoundingClientRect(); S.w = Math.max(1, r.width); S.h = Math.max(1, r.height);
-      if (S.cv && S.g) { const k = Math.min(.4, 700 / S.w) * (S.q || 1); S.cv.width = Math.max(2, S.w * k | 0); S.cv.height = Math.max(2, S.h * k | 0); S.g.gl.viewport(0, 0, S.cv.width, S.cv.height); }
-      if (S.ec) { const d = Math.min(devicePixelRatio || 1, 1); S.ec.width = S.w * d | 0; S.ec.height = S.h * d | 0; S.d = d; }
+      // Use lower resolution on mobile/low-power devices
+      const resFactor = coarse ? 0.3 : Math.min(.45, 800 / S.w);
+      if (S.cv && S.g) { const k = resFactor * (S.q || 1); S.cv.width = Math.max(2, S.w * k | 0); S.cv.height = Math.max(2, S.h * k | 0); S.g.gl.viewport(0, 0, S.cv.width, S.cv.height); }
+      if (S.ec) { const d = Math.min(devicePixelRatio || 1, coarse ? 1 : 1.5); S.ec.width = S.w * d | 0; S.ec.height = S.h * d | 0; S.d = d; }
       if (S.title) { const tr = S.title.getBoundingClientRect(); S.tox = tr.left - r.left; S.toy = tr.top - r.top; }
       S.sc = clamp(S.h / 800, .7, 1.25);
     }
@@ -290,7 +259,16 @@ void main(){
       const r = el.getBoundingClientRect(); S.tx = (e.clientX - r.left) / r.width; S.ty = (e.clientY - r.top) / r.height; S.last = now();
       photo(S);
     });
-    new IntersectionObserver(es => { S.vis = es[0].isIntersecting; if (S.vis) loop(); }, { rootMargin: '80px' }).observe(el);
+    new IntersectionObserver(es => {
+      S.vis = es[0].isIntersecting;
+      // Lazy-init corridor WebGL on first approach
+      if (S.vis && !S.glReady && S.cv) {
+        S.glReady = true;
+        S.g = makeGL(S.cv);
+        if (S.g) { S.cv.hidden = false; S.size(); } else S.cv.hidden = true;
+      }
+      if (S.vis) loop();
+    }, { rootMargin: '200px' }).observe(el);
     stages.push(S);
   }
 
@@ -339,12 +317,8 @@ void main(){
     S.x += (S.tx - S.x) * kk; S.y += (S.ty - S.y) * kk;
     const boost = S.trBoost ? clamp(1 - (t - S.trBoost) / 700, 0, 1) : 0, rad = 260 + boost * 300;
     const px = S.x * S.w, py = S.y * S.h, st = S.el.style;
-    // skip the style writes when the torch has not moved (cheap frames cost nothing)
-    if (Math.abs(px - (S._px || 0)) > .4 || Math.abs(py - (S._py || 0)) > .4 || Math.abs(rad - (S._rad || 0)) > 2) {
-      S._px = px; S._py = py; S._rad = rad;
-      st.setProperty('--tx', px.toFixed(1) + 'px'); st.setProperty('--ty', py.toFixed(1) + 'px'); st.setProperty('--tr', (rad * S.sc).toFixed(0) + 'px');
-      if (S.title) { S.title.style.setProperty('--lx', (px - S.tox).toFixed(1) + 'px'); S.title.style.setProperty('--ly', (py - S.toy).toFixed(1) + 'px'); }
-    }
+    st.setProperty('--tx', px.toFixed(1) + 'px'); st.setProperty('--ty', py.toFixed(1) + 'px'); st.setProperty('--tr', (rad * S.sc).toFixed(0) + 'px');
+    if (S.title) { S.title.style.setProperty('--lx', (px - S.tox).toFixed(1) + 'px'); S.title.style.setProperty('--ly', (py - S.toy).toFixed(1) + 'px'); }
     S.F *= Math.exp(-dt * 4);
     // weak device? lower the fog resolution, then switch it off
     S._slow = dt > .06 ? (S._slow || 0) + 1 : Math.max(0, (S._slow || 0) - 1);
@@ -362,7 +336,7 @@ void main(){
   function loop() {
     if (running) return; running = true;
     (function go(t) {
-      if (document.hidden || !(stages.some(s => s.vis) || corActive)) { running = false; return; }
+      if (document.hidden || !stages.some(s => s.vis)) { running = false; return; }
       stages.forEach(S => { if (S.vis) frame(S, t); });
       cor.tick && cor.tick();
       requestAnimationFrame(go);
@@ -370,78 +344,55 @@ void main(){
   }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) loop(); });
 
-  /* ---------- the corridor: scroll walks the camera forward through 3D space ----------
-     Performance: scroll geometry is cached at layout time (no layout reads while
-     scrolling), DOM writes are skipped unless a value actually moved, and the
-     corridor runs no canvases of its own — the fog and eyes stay on the hero. */
+  /* ---------- the corridor: scroll walks the camera forward through 3D space ---------- */
   const cor = {};
-  let corActive = false;
   (function corridor() {
     const root = $('#corridor'); if (!root) return;
     const track = $('#corTrack'), pin = $('#corPin'), scene = $('#corScene'), frames = $$('.frame', scene), n = frames.length;
     root.classList.add('live');
-    const info = $('#corInfo'), num = $('#corNum'), nm = $('#corName'), tag = $('#corTag'), go = $('#corGo'), rail = $('#corRail'), when = $('#corWhen');
+    const info = $('#corInfo'), num = $('#corNum'), nm = $('#corName'), tag = $('#corTag'), go = $('#corGo'), rail = $('#corRail');
     let Z = 720, W = 1, H = 1, cam = 0, camT = 0, rx = 0, ry = 0, rxT = 0, ryT = 0, active = -1;
-    let docTop = 0, span = 1; // cached scroll geometry
+    const walls = [['side'], ['side'], ['flr'], ['flr']].map(([k]) => { const d = document.createElement('div'); d.className = 'wall ' + k; scene.prepend(d); return d; });
 
     function layout() {
       W = pin.clientWidth; H = pin.clientHeight; Z = W < 760 ? 520 : 720;
       const off = W < 760 ? W * .06 : W * .19, L = (n + 1) * Z + 400, zc = -((n + 1) * Z) / 2 + 200;
       frames.forEach((f, i) => { f.style.transform = `translate(-50%,-50%) translate3d(${(i % 2 ? 1 : -1) * off}px,${(i % 3 - 1) * H * .035}px,${-i * Z}px)`; f._side = i % 2 ? 'left' : 'right'; });
-      // cache the scroll geometry once — progress is pure math afterwards
-      const r = track.getBoundingClientRect();
-      docTop = r.top + scrollY;
-      span = Math.max(1, track.offsetHeight - H);
+      const set = (w, len, hh, tr) => { w.style.width = len + 'px'; w.style.height = hh + 'px'; w.style.margin = `${-hh / 2}px 0 0 ${-len / 2}px`; w.style.transform = tr; };
+      set(walls[0], L, H * 1.8, `translate3d(${-W * .62}px,0,${zc}px) rotateY(90deg)`);
+      set(walls[1], L, H * 1.8, `translate3d(${W * .62}px,0,${zc}px) rotateY(90deg)`);
+      set(walls[2], W * 1.3, L, `translate3d(0,${H * .56}px,${zc}px) rotateX(90deg)`);
+      set(walls[3], W * 1.3, L, `translate3d(0,${-H * .56}px,${zc}px) rotateX(90deg)`);
       measure();
     }
-    function measure() { camT = clamp((scrollY - docTop) / span, 0, 1) * (n - 1) * Z; }
+    function measure() { const r = track.getBoundingClientRect(), max = track.offsetHeight - H; camT = clamp(-r.top / max, 0, 1) * (n - 1) * Z; pin.style.setProperty('--prog', clamp(-r.top / max, 0, 1)); }
     function render() {
       scene.style.transform = `rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) translateZ(${cam.toFixed(1)}px)`;
       let a = 0;
       frames.forEach((f, i) => {
-        const dz = i * Z - cam;
-        // cards stay opaque across the walking band: 3D depth sorting occludes them
-        // properly, distance is conveyed by the darkening overlay, and passed
-        // frames fade out quickly so nothing shows through the active card
-        let op;
-        if (dz < 0) op = clamp(1 + dz / (Z * .15), 0, 1);
-        else if (dz < Z * 2.2) op = 1;
-        else op = clamp(1 - (dz - Z * 2.2) / (Z * .5), 0, 1);
-        const dim = dz >= 0 ? clamp(dz / (Z * 1.5), 0, .72) : 0;
-        if (Math.abs((f._op ?? -1) - op) > .004 || Math.abs((f._dim ?? -1) - dim) > .004) { // write only when a frame visibly moved
-          f._op = op; f._dim = dim;
-          f.style.opacity = op.toFixed(3);
-          f.style.setProperty('--dim', dim.toFixed(2));
-          f.style.pointerEvents = op > .6 ? 'auto' : 'none';
-          const vis = op >= .02;
-          if (f._vis !== vis) { f._vis = vis; f.style.visibility = vis ? 'visible' : 'hidden'; }
-        }
+        const dz = i * Z - cam, op = dz >= 0 ? clamp(1 - dz / (Z * 2.4), 0, 1) : clamp(1 + dz / (Z * .5), 0, 1);
+        f.style.opacity = op.toFixed(3); f.style.setProperty('--dim', clamp(dz / (Z * 2.4), 0, .6).toFixed(2));
+        f.style.visibility = op < .02 ? 'hidden' : 'visible'; f.style.pointerEvents = op > .6 ? 'auto' : 'none';
         if (Math.abs(dz) < Math.abs(a * Z - cam)) a = i;
       });
       if (a !== active) {
         active = a; const f = frames[a]; pin.style.setProperty('--c', getComputedStyle(f).getPropertyValue('--c'));
-        info.dataset.side = f._side; num.textContent = String(a + 1).padStart(2, '0'); nm.textContent = f.dataset.title; tag.textContent = f.dataset.tag; go.href = f.getAttribute('href'); if (when) when.textContent = f.dataset.when || '';
+        info.dataset.side = f._side; num.textContent = String(a + 1).padStart(2, '0'); nm.textContent = f.dataset.title; tag.textContent = f.dataset.tag; go.href = f.getAttribute('href');
         info.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 380, easing: 'ease-out' });
       }
-      const rp = (cam / ((n - 1) * Z)).toFixed(3);
-      if (rail._p !== rp) { rail._p = rp; rail.style.setProperty('--p', rp); }
+      rail.style.setProperty('--p', (cam / ((n - 1) * Z)).toFixed(3));
     }
     cor.tick = () => {
-      if (!pin._v) return;
-      const t = now(), dt = Math.min(250, t - (cor._t || t)) / 1000; cor._t = t;
-      measure();
-      const k = 1 - Math.exp(-dt * 6), k2 = 1 - Math.exp(-dt * 3);
-      cam += (camT - cam) * k; rx += (rxT - rx) * k2; ry += (ryT - ry) * k2;
-      // skip the DOM work entirely when nothing has moved
-      if (Math.abs(cam - (cor._c || 0)) < .4 && Math.abs(rx - (cor._rx || 0)) < .04 && Math.abs(ry - (cor._ry || 0)) < .04) return;
-      cor._c = cam; cor._rx = rx; cor._ry = ry;
-      render();
+      if (!pin._v) return; measure();
+      const t = now(), dt = Math.min(250, t - (cor._t || t)) / 1000; cor._t = t; const k = 1 - Math.exp(-dt * 6), k2 = 1 - Math.exp(-dt * 3);
+      cam += (camT - cam) * k; rx += (rxT - rx) * k2; ry += (ryT - ry) * k2; render();
     };
     pin.addEventListener('pointermove', e => { const r = pin.getBoundingClientRect(); ryT = ((e.clientX - r.left) / r.width - .5) * 7; rxT = -((e.clientY - r.top) / r.height - .5) * 4; }, { passive: true });
-    new IntersectionObserver(es => { pin._v = corActive = es[0].isIntersecting; if (pin._v) { measure(); loop(); } }, { rootMargin: '200px' }).observe(track);
+    new IntersectionObserver(es => { pin._v = es[0].isIntersecting; if (pin._v) { measure(); loop(); } }, { rootMargin: '200px' }).observe(track);
     addEventListener('resize', layout); layout(); cam = camT; render();
+    // the pin is also a stage: fog and eyes drift past the frames
+    initStage(pin);
   })();
 
-  $$('[data-stage]').forEach(initStage);
-
+  $$('[data-stage]').forEach(el => { if (el.id !== 'corPin') initStage(el); });
 })();
