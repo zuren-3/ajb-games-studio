@@ -10,6 +10,7 @@ logo.png                  the AJB logo (transparent PNG, about 400px wide)
   bokkie
   martha-s-dolls
   the-moroccan-castle-3
+  cazafonia
 
 Example: uncursed-header.jpg, uncursed-hero.jpg
 Missing files are skipped. The page then uses the Steam picture, and if that fails, a generated dark scene.

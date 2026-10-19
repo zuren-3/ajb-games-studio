@@ -8,17 +8,51 @@
 <meta property="og:title" content="Studio | AJB Games Studio"><meta property="og:description" content="AJB GAMES STUDIO was founded by Ayman Jbari. Independent horror games, built in Unity."><meta property="og:type" content="website">
 <meta name="theme-color" content="#04060a">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anybody:wdth,wght@50..150,100..900&family=JetBrains+Mono:wght@500&family=Manrope:wght@400;500;700&family=Newsreader:ital,wght@1,400&display=swap">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anybody:wdth,wght@50..150,100..900&family=JetBrains+Mono:wght@500&family=Manrope:wght@400;500;700&family=Newsreader:ital,wght@1,400&family=Bebas+Neue&display=swap">
 <link rel="stylesheet" href="assets/style.css">
-<script>document.documentElement.className='js';try{document.documentElement.dataset.theme=localStorage.getItem('ajb-theme')||'dark'}catch(e){document.documentElement.dataset.theme='dark'}</script>
+<script>document.documentElement.className='js';document.documentElement.dataset.theme='dark'/* light mode temporarily disabled */</script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
-<header class="site-header"><div class="bar">
-<a class="brand" href="index.html" aria-label="AJB Games Studio, home"><img class="logo bar-logo" src="images/logo.png" alt="AJB Games Studio" onerror="this.style.display='none'"><span class="word"><b>AJB</b><span>Games Studio</span></span></a>
-<nav class="nav" aria-label="Main"><a href="games.html">Games</a><a href="studio.html" aria-current="page">Studio</a><a href="studio.html#follow">Follow</a><button class="btn sm theme-toggle" id="themeToggle" type="button" aria-label="Switch to light mode" title="Light mode"><svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5 5l1.9 1.9M17.1 17.1 19 19M19 5l-1.9 1.9M6.9 17.1 5 19"/></svg><svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.1A8.5 8.5 0 0 1 9.9 3.5a8.5 8.5 0 1 0 10.6 10.6Z"/></svg></button><a class="btn lamp sm" href="https://store.steampowered.com/curator/45501369" target="_blank" rel="noopener">Steam</a></nav><button class="menu-btn" id="menuBtn" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="menuPanel"><span></span><span></span><span></span></button>
-</div><div class="menu" id="menuPanel"><a href="games.html">Games</a><a href="studio.html" aria-current="page">Studio</a><a href="studio.html#follow">Follow</a><a href="https://store.steampowered.com/curator/45501369" target="_blank" rel="noopener">Steam</a></div><div class="progress" id="progress" aria-hidden="true"></div></header>
-<div class="grain" aria-hidden="true"></div><div class="cursor-light" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="bar">
+    <!-- Logo + wordmark -->
+    <a class="brand" href="index.html" aria-label="AJB Games Studio, home">
+      <img class="bar-logo" src="images/logo.png" alt="" aria-hidden="true" onerror="this.style.display='none'">
+      <span class="word"><b>AJB</b><span>Games Studio</span></span>
+    </a>
+
+    <!-- Desktop navigation -->
+    <nav class="nav" aria-label="Main navigation">
+      <a href="games.html">Games</a>
+      <a href="studio.html" aria-current="page">Studio</a>
+      <a href="studio.html#follow">Follow</a>
+      <a class="btn nav-steam sm" href="https://store.steampowered.com/curator/45501369" target="_blank" rel="noopener noreferrer">
+        <svg class="steam-icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" width="14" height="14">
+          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.58 3.8 10.28 8.97 11.64l3.27-7.64a3.5 3.5 0 0 1-1.24-.64 3.5 3.5 0 1 1 5.15-4.64l7.55-3.23A12 12 0 0 0 12 0zm4.5 14.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/>
+        </svg>
+        Steam
+      </a>
+    </nav>
+
+    <!-- Mobile hamburger -->
+    <button class="menu-btn" id="menuBtn" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="menuPanel">
+    <span class="bar-line"></span><span class="bar-line"></span><span class="bar-line"></span>
+  </button>
+  </div>
+
+  <div class="menu" id="menuPanel" role="dialog" aria-label="Navigation">
+    <div class="menu-inner">
+      <a href="games.html">Games</a>
+      <a href="studio.html" aria-current="page">Studio</a>
+      <a href="studio.html#follow">Follow</a>
+      <a href="https://store.steampowered.com/curator/45501369" target="_blank" rel="noopener noreferrer">Steam <span class="ext-arrow" aria-hidden="true">↗</span></a>
+    </div>
+  </div>
+  <div class="progress" id="progress" aria-hidden="true"></div>
+</header>
+<div class="grain" aria-hidden="true"></div>
+<div class="cursor-light" aria-hidden="true"></div>
 <main id="main" class="wrap page">
 <header class="page-title"><h1 class="big-h" data-scramble>The Studio</h1><p>Independent horror games by Ayman Jbari and AJB Games Studio.</p></header>
 <section class="studio"><div class="rv"><p class="quote">Cursed castles, haunted dolls, and family homes where something is deeply wrong.</p>

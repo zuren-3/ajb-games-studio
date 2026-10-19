@@ -31,7 +31,7 @@
     document.addEventListener('click', e => { if (!e.target.closest('.site-header')) setMenu(false); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape') { setMenu(false); menuBtn.focus(); } });
     menuPanel.addEventListener('click', e => { if (e.target.closest('a')) setMenu(false); });
-    addEventListener('resize', () => { if (innerWidth > 560) setMenu(false); });
+    addEventListener('resize', () => { if (innerWidth > 640) setMenu(false); });
   }
 
   /* ---------- pictures: local file, then Steam mirrors, then the drawn scene ---------- */
@@ -165,6 +165,29 @@
     setTimeout(bulbFlicker, 900 + Math.random() * 1800);
   }
 
+  /* ---------- mobile tape archive: native swipe deck (runs regardless of animation settings) ---------- */
+  const deck = $('#tapeDeck');
+  if (deck) {
+    const tapes = $$('.tape', deck), tag = $('#tapeTag'), num = $('#tapeNum'), cue = $('.scroll-cue');
+    let ticking = false, activeTape = -1;
+    const upd = () => {
+      ticking = false;
+      const mid = deck.clientWidth / 2;
+      let best = 0, bd = 1e9;
+      tapes.forEach((t, i) => { const r = t.getBoundingClientRect(); const d = Math.abs(r.left + r.width / 2 - mid); if (d < bd) { bd = d; best = i; } });
+      if (best === activeTape) return; // touch the DOM only when the centered tape changes
+      activeTape = best;
+      tapes.forEach((t, i) => t.classList.toggle('on', i === best));
+      if (tag) tag.textContent = tapes[best].dataset.tag || '';
+      if (num) num.textContent = String(best + 1).padStart(2, '0');
+    };
+    deck.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(upd); } }, { passive: true });
+    const mq = matchMedia('(max-width:760px)');
+    const setTarget = () => { if (cue) cue.setAttribute('href', mq.matches ? '#tapeArch' : '#corridor'); };
+    mq.addEventListener('change', setTarget); setTarget();
+    upd();
+  }
+
   if (reduce) { $$('.corridor').forEach(c => c.classList.remove('live')); return; }
 
   /* ---------- WebGL fog lit by a torch ---------- */
@@ -218,8 +241,8 @@ void main(){
 
     function size() {
       const r = el.getBoundingClientRect(); S.w = Math.max(1, r.width); S.h = Math.max(1, r.height);
-      if (S.cv && S.g) { const k = Math.min(.5, 900 / S.w) * (S.q || 1); S.cv.width = Math.max(2, S.w * k | 0); S.cv.height = Math.max(2, S.h * k | 0); S.g.gl.viewport(0, 0, S.cv.width, S.cv.height); }
-      if (S.ec) { const d = Math.min(devicePixelRatio || 1, 1.5); S.ec.width = S.w * d | 0; S.ec.height = S.h * d | 0; S.d = d; }
+      if (S.cv && S.g) { const k = Math.min(.4, 700 / S.w) * (S.q || 1); S.cv.width = Math.max(2, S.w * k | 0); S.cv.height = Math.max(2, S.h * k | 0); S.g.gl.viewport(0, 0, S.cv.width, S.cv.height); }
+      if (S.ec) { const d = Math.min(devicePixelRatio || 1, 1); S.ec.width = S.w * d | 0; S.ec.height = S.h * d | 0; S.d = d; }
       if (S.title) { const tr = S.title.getBoundingClientRect(); S.tox = tr.left - r.left; S.toy = tr.top - r.top; }
       S.sc = clamp(S.h / 800, .7, 1.25);
     }
@@ -282,8 +305,12 @@ void main(){
     S.x += (S.tx - S.x) * kk; S.y += (S.ty - S.y) * kk;
     const boost = S.trBoost ? clamp(1 - (t - S.trBoost) / 700, 0, 1) : 0, rad = 260 + boost * 300;
     const px = S.x * S.w, py = S.y * S.h, st = S.el.style;
-    st.setProperty('--tx', px.toFixed(1) + 'px'); st.setProperty('--ty', py.toFixed(1) + 'px'); st.setProperty('--tr', (rad * S.sc).toFixed(0) + 'px');
-    if (S.title) { S.title.style.setProperty('--lx', (px - S.tox).toFixed(1) + 'px'); S.title.style.setProperty('--ly', (py - S.toy).toFixed(1) + 'px'); }
+    // skip the style writes when the torch has not moved (cheap frames cost nothing)
+    if (Math.abs(px - (S._px || 0)) > .4 || Math.abs(py - (S._py || 0)) > .4 || Math.abs(rad - (S._rad || 0)) > 2) {
+      S._px = px; S._py = py; S._rad = rad;
+      st.setProperty('--tx', px.toFixed(1) + 'px'); st.setProperty('--ty', py.toFixed(1) + 'px'); st.setProperty('--tr', (rad * S.sc).toFixed(0) + 'px');
+      if (S.title) { S.title.style.setProperty('--lx', (px - S.tox).toFixed(1) + 'px'); S.title.style.setProperty('--ly', (py - S.toy).toFixed(1) + 'px'); }
+    }
     S.F *= Math.exp(-dt * 4);
     // weak device? lower the fog resolution, then switch it off
     S._slow = dt > .06 ? (S._slow || 0) + 1 : Math.max(0, (S._slow || 0) - 1);
@@ -301,7 +328,7 @@ void main(){
   function loop() {
     if (running) return; running = true;
     (function go(t) {
-      if (document.hidden || !stages.some(s => s.vis)) { running = false; return; }
+      if (document.hidden || !(stages.some(s => s.vis) || corActive)) { running = false; return; }
       stages.forEach(S => { if (S.vis) frame(S, t); });
       cor.tick && cor.tick();
       requestAnimationFrame(go);
@@ -309,55 +336,78 @@ void main(){
   }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) loop(); });
 
-  /* ---------- the corridor: scroll walks the camera forward through 3D space ---------- */
+  /* ---------- the corridor: scroll walks the camera forward through 3D space ----------
+     Performance: scroll geometry is cached at layout time (no layout reads while
+     scrolling), DOM writes are skipped unless a value actually moved, and the
+     corridor runs no canvases of its own — the fog and eyes stay on the hero. */
   const cor = {};
+  let corActive = false;
   (function corridor() {
     const root = $('#corridor'); if (!root) return;
     const track = $('#corTrack'), pin = $('#corPin'), scene = $('#corScene'), frames = $$('.frame', scene), n = frames.length;
     root.classList.add('live');
-    const info = $('#corInfo'), num = $('#corNum'), nm = $('#corName'), tag = $('#corTag'), go = $('#corGo'), rail = $('#corRail');
+    const info = $('#corInfo'), num = $('#corNum'), nm = $('#corName'), tag = $('#corTag'), go = $('#corGo'), rail = $('#corRail'), when = $('#corWhen');
     let Z = 720, W = 1, H = 1, cam = 0, camT = 0, rx = 0, ry = 0, rxT = 0, ryT = 0, active = -1;
-    const walls = [['side'], ['side'], ['flr'], ['flr']].map(([k]) => { const d = document.createElement('div'); d.className = 'wall ' + k; scene.prepend(d); return d; });
+    let docTop = 0, span = 1; // cached scroll geometry
 
     function layout() {
       W = pin.clientWidth; H = pin.clientHeight; Z = W < 760 ? 520 : 720;
       const off = W < 760 ? W * .06 : W * .19, L = (n + 1) * Z + 400, zc = -((n + 1) * Z) / 2 + 200;
       frames.forEach((f, i) => { f.style.transform = `translate(-50%,-50%) translate3d(${(i % 2 ? 1 : -1) * off}px,${(i % 3 - 1) * H * .035}px,${-i * Z}px)`; f._side = i % 2 ? 'left' : 'right'; });
-      const set = (w, len, hh, tr) => { w.style.width = len + 'px'; w.style.height = hh + 'px'; w.style.margin = `${-hh / 2}px 0 0 ${-len / 2}px`; w.style.transform = tr; };
-      set(walls[0], L, H * 1.8, `translate3d(${-W * .62}px,0,${zc}px) rotateY(90deg)`);
-      set(walls[1], L, H * 1.8, `translate3d(${W * .62}px,0,${zc}px) rotateY(90deg)`);
-      set(walls[2], W * 1.3, L, `translate3d(0,${H * .56}px,${zc}px) rotateX(90deg)`);
-      set(walls[3], W * 1.3, L, `translate3d(0,${-H * .56}px,${zc}px) rotateX(90deg)`);
+      // cache the scroll geometry once — progress is pure math afterwards
+      const r = track.getBoundingClientRect();
+      docTop = r.top + scrollY;
+      span = Math.max(1, track.offsetHeight - H);
       measure();
     }
-    function measure() { const r = track.getBoundingClientRect(), max = track.offsetHeight - H; camT = clamp(-r.top / max, 0, 1) * (n - 1) * Z; pin.style.setProperty('--prog', clamp(-r.top / max, 0, 1)); }
+    function measure() { camT = clamp((scrollY - docTop) / span, 0, 1) * (n - 1) * Z; }
     function render() {
       scene.style.transform = `rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) translateZ(${cam.toFixed(1)}px)`;
       let a = 0;
       frames.forEach((f, i) => {
-        const dz = i * Z - cam, op = dz >= 0 ? clamp(1 - dz / (Z * 2.4), 0, 1) : clamp(1 + dz / (Z * .5), 0, 1);
-        f.style.opacity = op.toFixed(3); f.style.setProperty('--dim', clamp(dz / (Z * 2.4), 0, .6).toFixed(2));
-        f.style.visibility = op < .02 ? 'hidden' : 'visible'; f.style.pointerEvents = op > .6 ? 'auto' : 'none';
+        const dz = i * Z - cam;
+        // cards stay opaque across the walking band: 3D depth sorting occludes them
+        // properly, distance is conveyed by the darkening overlay, and passed
+        // frames fade out quickly so nothing shows through the active card
+        let op;
+        if (dz < 0) op = clamp(1 + dz / (Z * .15), 0, 1);
+        else if (dz < Z * 2.2) op = 1;
+        else op = clamp(1 - (dz - Z * 2.2) / (Z * .5), 0, 1);
+        const dim = dz >= 0 ? clamp(dz / (Z * 1.5), 0, .72) : 0;
+        if (Math.abs((f._op ?? -1) - op) > .004 || Math.abs((f._dim ?? -1) - dim) > .004) { // write only when a frame visibly moved
+          f._op = op; f._dim = dim;
+          f.style.opacity = op.toFixed(3);
+          f.style.setProperty('--dim', dim.toFixed(2));
+          f.style.pointerEvents = op > .6 ? 'auto' : 'none';
+          const vis = op >= .02;
+          if (f._vis !== vis) { f._vis = vis; f.style.visibility = vis ? 'visible' : 'hidden'; }
+        }
         if (Math.abs(dz) < Math.abs(a * Z - cam)) a = i;
       });
       if (a !== active) {
         active = a; const f = frames[a]; pin.style.setProperty('--c', getComputedStyle(f).getPropertyValue('--c'));
-        info.dataset.side = f._side; num.textContent = String(a + 1).padStart(2, '0'); nm.textContent = f.dataset.title; tag.textContent = f.dataset.tag; go.href = f.getAttribute('href');
+        info.dataset.side = f._side; num.textContent = String(a + 1).padStart(2, '0'); nm.textContent = f.dataset.title; tag.textContent = f.dataset.tag; go.href = f.getAttribute('href'); if (when) when.textContent = f.dataset.when || '';
         info.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 380, easing: 'ease-out' });
       }
-      rail.style.setProperty('--p', (cam / ((n - 1) * Z)).toFixed(3));
+      const rp = (cam / ((n - 1) * Z)).toFixed(3);
+      if (rail._p !== rp) { rail._p = rp; rail.style.setProperty('--p', rp); }
     }
     cor.tick = () => {
-      if (!pin._v) return; measure();
-      const t = now(), dt = Math.min(250, t - (cor._t || t)) / 1000; cor._t = t; const k = 1 - Math.exp(-dt * 6), k2 = 1 - Math.exp(-dt * 3);
-      cam += (camT - cam) * k; rx += (rxT - rx) * k2; ry += (ryT - ry) * k2; render();
+      if (!pin._v) return;
+      const t = now(), dt = Math.min(250, t - (cor._t || t)) / 1000; cor._t = t;
+      measure();
+      const k = 1 - Math.exp(-dt * 6), k2 = 1 - Math.exp(-dt * 3);
+      cam += (camT - cam) * k; rx += (rxT - rx) * k2; ry += (ryT - ry) * k2;
+      // skip the DOM work entirely when nothing has moved
+      if (Math.abs(cam - (cor._c || 0)) < .4 && Math.abs(rx - (cor._rx || 0)) < .04 && Math.abs(ry - (cor._ry || 0)) < .04) return;
+      cor._c = cam; cor._rx = rx; cor._ry = ry;
+      render();
     };
     pin.addEventListener('pointermove', e => { const r = pin.getBoundingClientRect(); ryT = ((e.clientX - r.left) / r.width - .5) * 7; rxT = -((e.clientY - r.top) / r.height - .5) * 4; }, { passive: true });
-    new IntersectionObserver(es => { pin._v = es[0].isIntersecting; if (pin._v) { measure(); loop(); } }, { rootMargin: '200px' }).observe(track);
+    new IntersectionObserver(es => { pin._v = corActive = es[0].isIntersecting; if (pin._v) { measure(); loop(); } }, { rootMargin: '200px' }).observe(track);
     addEventListener('resize', layout); layout(); cam = camT; render();
-    // the pin is also a stage: fog and eyes drift past the frames
-    initStage(pin);
   })();
 
-  $$('[data-stage]').forEach(el => { if (el.id !== 'corPin') initStage(el); });
+  $$('[data-stage]').forEach(initStage);
+
 })();
