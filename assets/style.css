@@ -38,58 +38,63 @@ ul,ol{padding:0;list-style:none}
   background:repeating-linear-gradient(0deg,#000 0 3px,#130405 3px 4px)}
 
 /* ============================================================
-   HEADER + NAVIGATION
-   Fixed top bar: frosted glass, logo, desktop nav, hamburger.
+   HEADER + NAVIGATION — Floating pill navbar
+   Centered capsule that hovers above the page, not full-width.
+   On mobile collapses to logo + hamburger inside the same pill.
    ============================================================ */
 
-/* Sticky frosted header */
+/* Outer header: no background — just positions the floating pill */
 .site-header {
   position: fixed; inset: 0 0 auto 0; z-index: 70;
-  background: linear-gradient(rgba(4,3,3,.93), rgba(4,3,3,.78));
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--line);
+  display: flex; justify-content: center;
+  padding: 14px var(--pad) 0;
+  pointer-events: none;   /* clicks pass through the gap around the pill */
 }
 
-/* Inner row: logo | nav | hamburger */
+/* The pill itself */
 .bar {
-  max-width: 1240px; margin: auto;
-  padding: 0 var(--pad); height: 64px;
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  pointer-events: auto;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  height: 52px; padding: 0 8px 0 14px;
+  width: min(860px, 100%);
+  background: rgba(10,4,5,.82);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(200,60,60,.22);
+  border-radius: 999px;
+  box-shadow: 0 8px 40px rgba(0,0,0,.55), 0 0 0 1px rgba(255,59,47,.06) inset;
 }
 
-/* ---- Brand / Logo ---- */
-.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+/* ---- Brand / Logo inside pill ---- */
+.brand { display: flex; align-items: center; gap: 9px; text-decoration: none; flex-shrink: 0; }
 .bar-logo {
-  height: 38px; width: auto;
-  filter: drop-shadow(0 0 6px rgba(255,59,47,.4));
-  flex-shrink: 0;
+  height: 30px; width: 30px; border-radius: 8px;
+  filter: drop-shadow(0 0 5px rgba(255,59,47,.5));
 }
-/* "AJB · Games Studio" wordmark */
 .brand .word {
-  display: flex; flex-direction: row; align-items: baseline;
-  gap: 6px; line-height: 1; white-space: nowrap;
+  display: flex; align-items: baseline; gap: 5px;
+  line-height: 1; white-space: nowrap;
 }
 .brand b {
-  font: 400 1.5rem/1 var(--pf);
+  font: 400 1.15rem/1 var(--pf);
   color: var(--bone); letter-spacing: .1em; text-transform: uppercase;
 }
 .brand .word span {
-  font: 500 .82rem/1 var(--mono);
-  color: var(--mute); letter-spacing: .12em; text-transform: uppercase;
+  font: 500 .72rem/1 var(--mono);
+  color: var(--mute); letter-spacing: .1em; text-transform: uppercase;
   transition: color .25s;
 }
 .brand:hover .word span { color: var(--bone); }
 
-/* ---- Desktop navigation links ---- */
+/* ---- Desktop nav links (centre of pill) ---- */
 .nav {
   display: flex; align-items: center;
-  gap: clamp(10px, 2.5vw, 28px);
+  gap: clamp(6px, 2vw, 22px);
+  flex: 1; justify-content: center;
 }
-/* Plain text links with animated underline */
 .nav a:not(.btn) {
-  text-decoration: none; font-weight: 500; font-size: .9rem;
-  color: var(--mute); padding: 6px 0;
-  position: relative; transition: color .2s;
+  text-decoration: none; font-weight: 500; font-size: .875rem;
+  color: var(--mute); padding: 4px 2px;
+  position: relative; white-space: nowrap; transition: color .2s;
 }
 .nav a:not(.btn)::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 1.5px;
@@ -101,27 +106,46 @@ ul,ol{padding:0;list-style:none}
 .nav a:not(.btn):hover::after,
 .nav a:not(.btn)[aria-current]::after { transform: scaleX(1); }
 
-/* Steam CTA button in nav – pill with subtle icon */
-.nav-steam { display: inline-flex; align-items: center; gap: 6px; }
-.steam-icon { opacity: .75; transition: opacity .2s; }
-.nav-steam:hover .steam-icon { opacity: 1; }
+/* Steam pill CTA — right side of navbar */
+.nav-steam {
+  display: inline-flex; align-items: center; gap: 6px;
+  flex-shrink: 0;
+  background: var(--bone); color: #04060a !important;
+  border: none; border-radius: 999px;
+  font: 700 .82rem/1 var(--bf); padding: 0 16px; height: 36px;
+  cursor: pointer; text-decoration: none;
+  transition: background .2s, box-shadow .2s, transform .15s;
+}
+.nav-steam:hover {
+  background: var(--torch); color: #fff !important;
+  box-shadow: 0 0 28px rgba(255,59,47,.55);
+  transform: translateY(-1px);
+}
+.steam-icon { flex-shrink: 0; }
 
-/* Scroll-progress bar at bottom of header */
+/* Progress bar — runs along pill bottom edge */
 .progress {
   position: absolute; left: 0; bottom: -1px;
   height: 2px; width: 100%;
   background: var(--torch); transform: scaleX(0); transform-origin: left;
   box-shadow: 0 0 14px rgba(255,59,47,.95);
+  border-radius: 0 0 999px 999px;
 }
 
-/* Hide desktop text links below 700px; lamp btn below 780px */
-@media (max-width: 700px) {
+/* Hide centre links at narrow widths to keep pill compact */
+@media (max-width: 680px) {
   .nav a:not(.btn) { display: none; }
-  .bar { height: 56px; }
+  .bar { padding: 0 6px 0 12px; }
 }
-@media (max-width: 780px) {
+@media (max-width: 520px) {
   .nav .nav-steam { display: none; }
-  .nav { gap: 10px; }
+}
+
+/* Light mode pill */
+[data-theme="light"] .bar {
+  background: rgba(250,246,242,.88);
+  border-color: rgba(150,60,50,.25);
+  box-shadow: 0 8px 32px rgba(0,0,0,.14), 0 0 0 1px rgba(194,35,24,.06) inset;
 }
 
 /* ============================================================
@@ -149,14 +173,15 @@ ul,ol{padding:0;list-style:none}
 .menu-btn[aria-expanded="true"] .bar-line:nth-child(2) { opacity: 0; transform: scaleX(0); }
 .menu-btn[aria-expanded="true"] .bar-line:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
-/* Slide-down panel */
+/* Slide-down panel — drops below the pill */
 .menu {
-  position: absolute; left: 0; right: 0; top: 100%; z-index: 5;
-  display: none;                       /* shown as grid on mobile */
-  background: rgba(7,4,5,.97);
-  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  border-bottom: 1px solid var(--line);
-  box-shadow: 0 26px 60px rgba(0,0,0,.6);
+  position: fixed; left: var(--pad); right: var(--pad); top: 76px; z-index: 5;
+  display: none;
+  background: rgba(10,4,5,.96);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(200,60,60,.2);
+  border-radius: 20px;
+  box-shadow: 0 26px 60px rgba(0,0,0,.7);
   transform: translateY(-10px); opacity: 0; visibility: hidden;
   transition: transform .3s ease, opacity .3s ease, visibility .3s;
 }
@@ -255,7 +280,8 @@ p{max-width:64ch}
 .flash{position:absolute;inset:0;z-index:7;pointer-events:none;background:radial-gradient(circle at var(--tx,50%) var(--ty,50%),rgba(255,255,255,.55),rgba(190,230,255,.18) 40%,transparent 70%);opacity:0}
 .flash.pop{animation:pop .42s ease-out}
 @keyframes pop{0%{opacity:0}18%{opacity:.7}100%{opacity:0}}
-.hud{position:absolute;inset:78px var(--pad) 18px;z-index:5;pointer-events:none;font:500 .72rem/1 var(--mono);color:rgba(232,239,244,.78);letter-spacing:.1em}
+/* HUD inset from top accounts for the floating pill height (52px) + 14px gap + 12px breathing room */
+.hud{position:absolute;inset:88px var(--pad) 18px;z-index:5;pointer-events:none;font:500 .72rem/1 var(--mono);color:rgba(232,239,244,.78);letter-spacing:.1em}
 .hud span{position:absolute}
 .hud .tl{left:0;top:0}.hud .tr{right:0;top:0;display:flex;align-items:center;gap:8px}
 .hud .bl{left:0;bottom:0}.hud .br{right:0;bottom:0}
@@ -274,7 +300,8 @@ p{max-width:64ch}
 .poster{position:absolute;width:min(34vw,360px);transform:rotate(var(--rot));border:1px solid rgba(255,255,255,.14);background:#05080c;box-shadow:0 0 80px color-mix(in srgb,var(--c) 55%,transparent)}
 .poster .art{aspect-ratio:460/215}
 .poster b{position:absolute;left:10px;bottom:8px;z-index:2;font:700 .9rem/1 var(--hf);font-variation-settings:"wdth" 120}
-.hero-body{position:relative;z-index:6;padding-top:120px;padding-bottom:clamp(64px,12vh,120px);pointer-events:none}
+/* padding-top clears the floating pill (52px pill + 14px gap + breathing room) */
+.hero-body{position:relative;z-index:6;padding-top:clamp(100px,14vh,140px);padding-bottom:clamp(64px,12vh,120px);pointer-events:none}
 .hero-body a,.hero-body .btn{pointer-events:auto}
 .hero-logo{height:56px;width:auto;margin-bottom:18px}
 .title{font:900 clamp(7rem,30vw,25rem)/.78 var(--hf);font-variation-settings:"wdth" 100;letter-spacing:-.02em;margin-left:-.04em;
@@ -442,7 +469,8 @@ footer {
 .foot-logo{display:block;height:64px;width:64px;border-radius:10px;border:1px solid var(--line);box-shadow:0 0 44px rgba(255,59,47,.22);margin-bottom:14px}
 
 /* ---------- inner pages ---------- */
-.page{padding-top:124px}
+/* Floating pill = 52px + 14px top gap → 80px clearance total */
+.page{padding-top:96px}
 .page-title{margin-bottom:clamp(28px,5vw,56px)}
 .page-title p{margin-top:18px;color:var(--mute);font-size:1.15rem}
 .filters{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:28px}
