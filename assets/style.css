@@ -212,8 +212,9 @@ ul,ol{padding:0;list-style:none}
 
 /* Slide-down panel — drops below the pill */
 .menu {
-  position: fixed; left: var(--pad); right: var(--pad); top: 86px; z-index: 5;
+  position: fixed; left: var(--pad); right: var(--pad); top: 86px; z-index: 69;
   display: none;
+  pointer-events: auto;
   background: rgba(10,4,5,.96);
   backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(200,60,60,.2);
